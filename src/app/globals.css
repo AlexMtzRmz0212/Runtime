@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+/* Late-night broadcast: a dark room lit by one on-air colour. Dark only, on purpose. */
+:root {
+  color-scheme: dark;
+  --bg: #0f1115; /* the room */
+  --panel: #171a21; /* the set */
+  --well: #0b0c10; /* inset: inputs */
+  --border: #2a2e38;
+  --text: #ece9e2;
+  --muted: #9a9eab;
+  --accent: #ff7a59; /* on-air */
+  --ok: #6ccb8b;
+  --info: #6aa9ff;
+  --warn: #e9b44c; /* Waiting: caught up, next episode not out yet */
+  --danger: #f0645c;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-well: var(--well);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-ok: var(--ok);
+  --color-info: var(--info);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-hanken), ui-sans-serif, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  html {
+    scroll-padding-top: 5rem;
+    scrollbar-gutter: stable;
+    -webkit-tap-highlight-color: transparent;
+  }
+  a,
+  button,
+  label,
+  input,
+  select,
+  textarea,
+  summary {
+    touch-action: manipulation;
+  }
+  select option {
+    background: var(--panel);
+    color: var(--text);
+  }
+  ::selection {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply relative inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-panel px-3.5 text-sm font-medium whitespace-nowrap text-text transition-colors hover:border-muted active:translate-y-px disabled:cursor-default disabled:opacity-50 disabled:hover:border-border disabled:active:translate-y-0;
+  }
+  .btn-primary {
+    @apply border-accent bg-accent text-bg hover:border-accent hover:brightness-110 disabled:hover:border-accent disabled:hover:brightness-100;
+  }
+  .input {
+    @apply h-9 w-full rounded-md border border-border bg-well px-3 text-sm text-text outline-none transition-colors placeholder:text-muted focus:border-accent disabled:opacity-60;
+  }
+  .label {
+    @apply mb-1.5 block text-sm text-muted;
+  }
+  .page-title {
+    @apply mb-6 font-display text-4xl leading-none font-extrabold tracking-tight sm:text-5xl;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-0.5 text-xs whitespace-nowrap text-muted;
+  }
+}
+
+/* Waiting indicators. With reduced motion they stay still: a ring with a gap, and a bar that sits part-filled. */
+.spinner {
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+}
+/* On the orange primary button: a dark ring so it shows against the fill. */
+.spinner-on-accent {
+  border-color: rgb(0 0 0 / 0.25);
+  border-top-color: var(--bg);
+}
+.bar-sweep {
+  left: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spinner {
+    animation: spin 750ms linear infinite;
+  }
+  .bar-sweep {
+    animation: sweep 1.3s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+  .rise {
+    animation: rise 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+/* Quick search: a native modal dialog, near the top like a command palette. */
+dialog.quick {
+  max-width: none;
+  max-height: none;
+  margin: 12vh auto auto;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border: 0;
+}
+dialog.quick::backdrop {
+  background: rgb(8 9 12 / 0.7);
+}
+@media (prefers-reduced-motion: no-preference) {
+  dialog.quick[open] > * {
+    animation: rise 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
