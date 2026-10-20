@@ -22,6 +22,7 @@ export function OwnerNav({ links }: { links: { href: string; label: string }[] }
         {links.map((l) => (
           <NavLink key={l.href} href={l.href}>{l.label}</NavLink>
         ))}
+        {owner && <NavLink href="/ranks">Ranks</NavLink>}
         {owner && <NavLink href="/add">Add</NavLink>}
       </div>
       <div className="ml-auto flex items-center gap-4">

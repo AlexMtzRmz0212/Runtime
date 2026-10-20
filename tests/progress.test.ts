@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { episodeLabel, nextUp, progressOf, seasonsOf } from "@/lib/progress";
+import { episodeLabel, nextUp, progressOf, seasonsOf, splitsOf } from "@/lib/progress";
 
 const ep = (season: number, episode: number, watched: boolean) => ({ season, episode, title: `t${season}${episode}`, watched });
 
@@ -25,6 +25,15 @@ describe("seasonsOf", () => {
     expect(seasonsOf([ep(2, 1, true), ep(1, 1, true), ep(1, 2, false)])).toEqual([
       { season: 1, watched: 1, total: 2 },
       { season: 2, watched: 1, total: 1 },
+    ]);
+  });
+});
+
+describe("splitsOf", () => {
+  it("marks where each season ends along the whole show", () => {
+    expect(splitsOf([ep(2, 1, false), ep(1, 1, true), ep(1, 2, false), ep(1, 3, false)])).toEqual([
+      { season: 1, end: 0.75 },
+      { season: 2, end: 1 },
     ]);
   });
 });

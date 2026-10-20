@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- A small screen with its on-air dot, on the room-dark background. -->
-  <rect width="32" height="32" rx="7" fill="#0f1115"/>
-  <rect x="6" y="8" width="20" height="14" rx="3" fill="none" stroke="#ff7a59" stroke-width="2.5"/>
-  <path d="M12 26h8" stroke="#ff7a59" stroke-width="2.5" stroke-linecap="round"/>
-  <circle cx="16" cy="15" r="2.6" fill="#ff7a59"/>
+  <!-- A race bib on the asphalt: paper, the course-blue band, two safety-pin holes. -->
+  <rect width="32" height="32" rx="7" fill="#1f2329"/>
+  <rect x="5" y="8" width="22" height="17" rx="2.5" fill="#f3f4f1"/>
+  <path d="M5 10.5A2.5 2.5 0 0 1 7.5 8h17a2.5 2.5 0 0 1 2.5 2.5V13H5z" fill="#5b8cff"/>
+  <circle cx="8.5" cy="21.5" r="1.4" fill="#1f2329"/>
+  <circle cx="23.5" cy="21.5" r="1.4" fill="#1f2329"/>
 </svg>

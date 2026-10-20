@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Spinner } from "@/components/Progress";
 
 export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+
+  // Start in the field with a mouse and keyboard; on a phone that would throw the keyboard up over the page.
+  useEffect(() => {
+    if (window.matchMedia("(pointer: fine)").matches) input.current?.focus();
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,15 +30,15 @@ export default function Login() {
 
   return (
     <form onSubmit={submit} className="mx-auto mt-16 flex max-w-xs flex-col gap-4 sm:mt-24">
-      <h1 className="font-display text-4xl leading-none font-extrabold">Owner sign in</h1>
+      <h1 className="page-title">Owner sign in</h1>
       <label className="block">
         <span className="label">Password</span>
         <input
+          ref={input}
           className="input"
           type="password"
           name="password"
           autoComplete="current-password"
-          autoFocus
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           aria-invalid={error ? true : undefined}
@@ -43,7 +50,10 @@ export default function Login() {
           {error}
         </p>
       )}
-      <button className="btn btn-primary" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+      <button className="btn btn-primary" disabled={busy}>
+        {busy && <Spinner onAccent />}
+        {busy ? "Signing in…" : "Sign in"}
+      </button>
     </form>
   );
 }

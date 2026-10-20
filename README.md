@@ -1,6 +1,6 @@
-# TV-Shows
+# Runtime
 
-A personal TV tracker that uses **Notion as its database**, with a public page anyone can look at and an owner view (behind a password) where you tick episodes, change status and score, and add shows. Same shape as [Cinetech](../Cinetech).
+Runtime is a personal TV tracker, binge-watching as a marathon, that uses **Notion as its database**, with a public page anyone can look at and an owner view (behind a password) where you tick episodes, change status and score, and add shows. Same shape as [Cinetech](../Cinetech).
 
 - **Public**: library with search and filters, a *Continue watching* strip, a Top list, and a page per show with season and episode progress. Read-only.
 - **Owner** (lock icon, then password): tick single episodes or a whole season, edit status and score, **fill a show's episodes from TVmaze with one button**, and **add a new show by searching TVmaze**.

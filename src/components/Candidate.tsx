@@ -15,7 +15,7 @@ export interface TvmazeCandidate {
 
 /** One TVmaze search result: poster, name, years, network. */
 export function CandidateInfo({ c }: { c: TvmazeCandidate }) {
-  const meta = [seasonLabel(c.premiered, c.ended), c.network, c.status].filter(Boolean).join(" · ");
+  const meta = [seasonLabel(c.premiered, c.ended), c.network, c.status].filter(Boolean).join(", ");
   return (
     <span className="flex min-w-0 items-center gap-3">
       {/* eslint-disable-next-line @next/next/no-img-element */}

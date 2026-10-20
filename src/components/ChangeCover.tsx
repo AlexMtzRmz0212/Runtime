@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { posterSize } from "@/lib/format";
 import { useOwner } from "./useOwner";
 
@@ -22,6 +22,17 @@ export function ChangeCover({ slug }: { slug: string }) {
   const [tvmazeId, setTvmazeId] = useState<number | undefined>();
   const [picked, setPicked] = useState<string | undefined>();
   const [error, setError] = useState("");
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(false);
+
+  // The button and the panel take each other's place, so focus goes along: into the panel as it opens, back to the
+  // button as it closes.
+  useEffect(() => {
+    if (open) panel.current?.focus();
+    else if (wasOpen.current) trigger.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
 
   if (!owner) return null;
 
@@ -37,7 +48,7 @@ export function ChangeCover({ slug }: { slug: string }) {
       setTvmazeId(data.tvmazeId);
       setPicked(data.current);
     } else {
-      setError(data?.error ?? "Couldn't reach TVmaze");
+      setError(data?.error ?? "Couldn't reach TVmaze. Cancel and try again.");
     }
     setLoading(false);
   }
@@ -55,20 +66,20 @@ export function ChangeCover({ slug }: { slug: string }) {
       setOpen(false);
       router.refresh();
     } else {
-      setError(((await res?.json().catch(() => null)) as { error?: string } | null)?.error ?? "Couldn't save the cover");
+      setError(((await res?.json().catch(() => null)) as { error?: string } | null)?.error ?? "Couldn't save the cover. Try again.");
     }
     setSaving(false);
   }
 
   if (!open) {
     return (
-      <button className="btn mt-4" onClick={load}>Change cover</button>
+      <button ref={trigger} className="btn mt-4" onClick={load}>Change cover</button>
     );
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-border bg-panel p-4">
-      <p className="mb-3 text-sm text-muted">{loading ? "Loading posters from TVmaze…" : options.length ? "Pick a cover:" : "TVmaze has no other posters for this show."}</p>
+    <div ref={panel} tabIndex={-1} aria-label="Change cover" role="group" className="mt-4 rounded-lg border border-border bg-panel p-4">
+      <p aria-live="polite" className="mb-3 text-sm text-muted">{loading ? "Loading posters from TVmaze…" : options.length ? "Pick a cover:" : error ? "" : "TVmaze has no other posters for this show."}</p>
       {options.length > 0 && (
         <ul className="mb-4 flex flex-wrap gap-3">
           {options.map((o) => (
@@ -80,8 +91,8 @@ export function ChangeCover({ slug }: { slug: string }) {
                 className={`block w-24 cursor-pointer rounded-md border-2 p-0.5 text-left transition-colors ${picked === o.url ? "border-accent" : "border-transparent hover:border-muted"}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={posterSize(o.url, "medium")} alt="" loading="lazy" className="aspect-[2/3] w-full rounded bg-well object-cover" />
-                <span className="mt-1 block truncate text-xs text-muted">{o.label}{o.url === current ? " · current" : ""}</span>
+                <img src={posterSize(o.url, "medium")} alt="" width={210} height={295} loading="lazy" className="aspect-[2/3] w-full rounded bg-well object-cover" />
+                <span className="mt-1 block truncate text-xs text-muted">{o.label}{o.url === current ? " (current)" : ""}</span>
               </button>
             </li>
           ))}

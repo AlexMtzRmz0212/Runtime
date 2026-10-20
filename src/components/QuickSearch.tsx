@@ -3,8 +3,10 @@
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { plural } from "@/lib/format";
 import { normalizeName } from "@/lib/merge";
 import { StatusChip } from "./Bits";
+import { useFindKey } from "./useFindKey";
 import { useOwner } from "./useOwner";
 import { Poster } from "./Poster";
 
@@ -16,15 +18,16 @@ interface Entry {
   year?: string;
 }
 
-// The list is fetched once per page load, the first time the popup opens.
+// The list is fetched once per page load, the first time the popup opens. A failed fetch is forgotten, so the next
+// opening tries again.
 let index: Promise<Entry[]> | undefined;
 const loadIndex = () =>
   (index ??= fetch("/api/shows-index")
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error("failed"))))
     .then((d: { shows: Entry[] }) => d.shows)
-    .catch(() => {
+    .catch((error: unknown) => {
       index = undefined;
-      return [] as Entry[];
+      throw error;
     }));
 
 // Pages with a search of their own. Everywhere else Ctrl+F opens this popup.
@@ -40,7 +43,9 @@ export function QuickSearch() {
   const owner = useOwner();
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const findKey = useFindKey();
   const [shows, setShows] = useState<Entry[]>([]);
+  const [load, setLoad] = useState<"loading" | "ready" | "failed">("loading");
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
   const available = !OWN_SEARCH.includes(pathname);
@@ -51,7 +56,14 @@ export function QuickSearch() {
     setActive(0);
     dialog.current.showModal();
     input.current?.focus();
-    void loadIndex().then(setShows);
+    setLoad((l) => (l === "ready" ? l : "loading"));
+    loadIndex().then(
+      (list) => {
+        setShows(list);
+        setLoad("ready");
+      },
+      () => setLoad("failed"),
+    );
   }
 
   // Ctrl+F (Cmd+F on a Mac) opens the popup. With the popup already open, a second press falls through to the browser's own find.
@@ -83,7 +95,9 @@ export function QuickSearch() {
   }, [shows, q]);
 
   const trimmed = q.trim();
-  const canAdd = owner === true && trimmed.length >= 2 && matches.length === 0;
+  const canAdd = owner === true && load === "ready" && trimmed.length >= 2 && matches.length === 0;
+  // Read out as the results change; the visible list says the same thing.
+  const announcement = !trimmed || load === "loading" ? "" : load === "failed" ? "Couldn't load your library" : matches.length ? plural(matches.length, "match", "matches") : "No shows match";
   const addHref = `/add?q=${encodeURIComponent(trimmed)}`;
 
   function go(href: string) {
@@ -115,7 +129,7 @@ export function QuickSearch() {
         className="-m-2 inline-flex cursor-pointer items-center gap-1.5 p-2 text-muted transition-colors hover:text-text"
         aria-label="Search the library"
         aria-keyshortcuts="Control+F Meta+F"
-        title="Search (Ctrl F)"
+        title={`Search (${findKey})`}
       >
         <MagnifyingGlass size={18} aria-hidden />
       </button>
@@ -135,7 +149,12 @@ export function QuickSearch() {
               ref={input}
               className="input h-11 text-base"
               type="search"
+              name="q"
+              autoComplete="off"
+              spellCheck={false}
               role="combobox"
+              aria-label="Search your library"
+              aria-autocomplete="list"
               aria-expanded={matches.length > 0}
               aria-controls="quick-results"
               aria-activedescendant={matches[active] ? `quick-${matches[active].slug}` : undefined}
@@ -149,35 +168,38 @@ export function QuickSearch() {
             />
           </div>
 
-          <div className="max-h-[60vh] overflow-y-auto p-2">
-            {!trimmed && <p className="px-3 py-6 text-center text-sm text-muted">Type a show&apos;s name.</p>}
+          <div className="max-h-[60vh] overflow-y-auto overscroll-contain p-2">
+            <p role="status" className="sr-only">{announcement}</p>
+            {!trimmed && <p className="px-3 py-6 text-center text-sm text-muted">Type a show’s name.</p>}
 
-            {matches.length > 0 && (
-              <ul id="quick-results" role="listbox" aria-label="Shows in your library">
-                {matches.map((s, i) => (
-                  <li key={s.slug} id={`quick-${s.slug}`} role="option" aria-selected={i === active}>
-                    <button
-                      type="button"
-                      onClick={() => go(`/show/${s.slug}`)}
-                      onMouseMove={() => setActive(i)}
-                      className={`flex w-full cursor-pointer items-center gap-3 rounded-lg p-2 text-left transition-colors ${i === active ? "bg-well" : ""}`}
-                    >
-                      <Poster url={s.poster} name={s.name} className="w-9 shrink-0" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold">{s.name}</span>
-                        <span className="block truncate text-xs text-muted">In your library{s.year ? ` · ${s.year}` : ""}</span>
-                      </span>
-                      <StatusChip status={s.status} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {/* Options aren't buttons: focus stays in the field, which moves through them with the arrow keys. */}
+            <ul id="quick-results" role="listbox" aria-label="Shows in your library" hidden={matches.length === 0}>
+              {matches.map((s, i) => (
+                <li
+                  key={s.slug}
+                  id={`quick-${s.slug}`}
+                  role="option"
+                  aria-selected={i === active}
+                  onClick={() => go(`/show/${s.slug}`)}
+                  onMouseMove={() => setActive(i)}
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors ${i === active ? "bg-well" : ""}`}
+                >
+                  <Poster url={s.poster} name={s.name} className="w-9 shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{s.name}</span>
+                    <span className="block truncate text-xs text-muted">In your library{s.year ? `, ${s.year}` : ""}</span>
+                  </span>
+                  <StatusChip status={s.status} />
+                </li>
+              ))}
+            </ul>
 
             {trimmed && matches.length === 0 && (
               <div className="flex flex-col items-center gap-3 px-3 py-6 text-center">
-                <p className="text-sm text-muted">{shows.length === 0 ? "Loading…" : "No shows match."}</p>
-                {canAdd && shows.length > 0 && (
+                <p className={`text-sm ${load === "failed" ? "text-danger" : "text-muted"}`}>
+                  {load === "loading" ? "Loading…" : load === "failed" ? "Couldn't load your library. Close this and try again." : "No shows match."}
+                </p>
+                {canAdd && (
                   <>
                     <button type="button" className="btn btn-primary max-w-full" onClick={() => go(addHref)}>
                       <span className="truncate">Add “{trimmed}” as a new show</span>
