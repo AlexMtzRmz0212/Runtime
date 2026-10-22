@@ -28,17 +28,18 @@ export function pageToShow(page: NotionAny, titleProp: string): RawShow {
     imdb: num(p[SHOW.imdb]),
     top: choice(p[SHOW.top]),
     genres: names(p[SHOW.genre]),
-    platforms: names(p[SHOW.platform]),
     cast: names(p[SHOW.cast]),
     directors: names(p[SHOW.directors]),
     tvmazeId: num(p[SHOW.tvmazeId]),
     poster: p[SHOW.poster]?.url || undefined,
+    runtime: num(p[SHOW.runtime]),
     hasIcon: Boolean(page.icon),
     watchedWith: choice(p[SHOW.watchedWith]),
     scoreAlex: num(p[SHOW.scoreAlex]),
     scoreMish: num(p[SHOW.scoreMish]),
     scoreChar: num(p[SHOW.scoreChar]),
     createdTime: page.created_time,
+    editedTime: page.last_edited_time,
   };
 }
 
@@ -56,6 +57,10 @@ export function showPatchToProperties(patch: ShowPatch, statusType: "status" | "
   if (patch.tvmazeId !== undefined) out[SHOW.tvmazeId] = { number: patch.tvmazeId };
   if (patch.poster !== undefined) out[SHOW.poster] = { url: patch.poster };
   if (patch.seasons !== undefined) out[SHOW.seasons] = { number: patch.seasons };
+  if (patch.runtime !== undefined) out[SHOW.runtime] = { number: patch.runtime };
+  if (patch.genres !== undefined) out[SHOW.genre] = { multi_select: patch.genres.map((name) => ({ name })) };
+  if (patch.cast !== undefined) out[SHOW.cast] = { multi_select: patch.cast.map((name) => ({ name })) };
+  if (patch.directors !== undefined) out[SHOW.directors] = { multi_select: patch.directors.map((name) => ({ name })) };
   if (patch.startDate !== undefined || patch.endDate !== undefined) {
     out[SHOW.length] = { date: patch.startDate ? { start: patch.startDate, end: patch.endDate ?? null } : null };
   }
@@ -66,13 +71,13 @@ export function newShowToProperties(input: NewShow, titleProp: string, statusTyp
   const out: Record<string, NotionAny> = { [titleProp]: title(input.name) };
   if (input.type) out[SHOW.type] = { select: { name: input.type } };
   if (input.status) out[SHOW.status] = { [statusType]: { name: input.status } };
-  if (input.platforms?.length) out[SHOW.platform] = { multi_select: input.platforms.map((name) => ({ name })) };
   if (input.genres?.length) out[SHOW.genre] = { multi_select: input.genres.map((name) => ({ name })) };
   const seasons = input.seasons ?? input.episodesPerSeason?.length;
   if (seasons) out[SHOW.seasons] = { number: seasons };
   if (input.startDate) out[SHOW.length] = { date: { start: input.startDate, end: input.endDate ?? null } };
   if (input.tvmazeId !== undefined) out[SHOW.tvmazeId] = { number: input.tvmazeId };
   if (input.poster) out[SHOW.poster] = { url: input.poster };
+  if (input.runtime) out[SHOW.runtime] = { number: input.runtime };
   return out;
 }
 
@@ -91,6 +96,8 @@ export function pageToEpisode(page: NotionAny, titleProp: string): Episode | und
     watched: Boolean(p[EPISODE.watched.name]?.checkbox),
     watchedDate: day(p[EPISODE.watchedDate.name]?.date?.start),
     airDate: day(p[EPISODE.airDate.name]?.date?.start),
+    watching: Boolean(p[EPISODE.watching.name]?.checkbox),
+    editedTime: page.last_edited_time,
   };
 }
 
@@ -107,9 +114,13 @@ export function newEpisodeToProperties(showPageId: string, ep: { season: number;
   return out;
 }
 
+/** Ticking or unticking an episode also ends "Watching": it's either done, or back to not started. */
 export function watchedToProperties(watched: boolean, date?: string | null): Record<string, NotionAny> {
   return {
     [EPISODE.watched.name]: { checkbox: watched },
     [EPISODE.watchedDate.name]: { date: watched && date ? { start: date } : null },
+    [EPISODE.watching.name]: { checkbox: false },
   };
 }
+
+export const watchingToProperties = (watching: boolean): Record<string, NotionAny> => ({ [EPISODE.watching.name]: { checkbox: watching } });

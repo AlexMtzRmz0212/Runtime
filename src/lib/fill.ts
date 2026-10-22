@@ -36,11 +36,45 @@ export function isWatched(rule: WatchedRule, ep: { season: number; episode: numb
   return false;
 }
 
-const key = (e: { season: number; episode: number }) => `${e.season}x${e.episode}`;
+/** "5x8": one episode of a show, as the fill run passes it around. */
+export const episodeKey = (e: { season: number; episode: number }) => `${e.season}x${e.episode}`;
+export const isEpisodeKey = (v: unknown): v is string => typeof v === "string" && /^\d{1,3}x\d{1,4}$/.test(v);
 
-/** What is left to create: every TVmaze episode the show doesn't have yet, with its starting watched state. Never touches existing rows. */
-export function planFill(existing: { season: number; episode: number }[], listed: NewEpisode[], rule: WatchedRule, today: string): { toCreate: NewEpisode[]; already: number } {
-  const have = new Set(existing.map(key));
-  const toCreate = listed.filter((e) => !have.has(key(e))).map((e) => ({ ...e, watched: isWatched(rule, e, today) }));
+/**
+ * What is left to create: every TVmaze episode the show doesn't have yet, with its starting watched state. Never touches
+ * existing rows. `skip` lists episodes known to exist that Notion's query may not return yet (created a moment ago).
+ */
+export function planFill(existing: { season: number; episode: number }[], listed: NewEpisode[], rule: WatchedRule, today: string, skip: Iterable<string> = []): { toCreate: NewEpisode[]; already: number } {
+  const have = new Set([...existing.map(episodeKey), ...skip]);
+  const toCreate = listed.filter((e) => !have.has(episodeKey(e))).map((e) => ({ ...e, watched: isWatched(rule, e, today) }));
   return { toCreate, already: listed.length - toCreate.length };
+}
+
+/**
+ * Episodes this server created (or is creating) lately, per show. Notion's query can lag a few seconds behind pages it has
+ * just created, so a fill call that re-reads the show right after a batch, or a second call running at the same time, would
+ * create them again. Entries expire once Notion has surely caught up.
+ */
+export class RecentEpisodes {
+  private shows = new Map<string, Map<string, number>>();
+  constructor(private ttlMs = 10 * 60_000) {}
+
+  /** Keys still remembered for the show. */
+  of(showPageId: string, now = Date.now()): string[] {
+    const keys = this.shows.get(showPageId);
+    if (!keys) return [];
+    for (const [k, until] of keys) if (until <= now) keys.delete(k);
+    return [...keys.keys()];
+  }
+
+  add(showPageId: string, keys: string[], now = Date.now()) {
+    const map = this.shows.get(showPageId) ?? new Map<string, number>();
+    for (const k of keys) map.set(k, now + this.ttlMs);
+    this.shows.set(showPageId, map);
+  }
+
+  remove(showPageId: string, keys: string[]) {
+    const map = this.shows.get(showPageId);
+    for (const k of keys) map?.delete(k);
+  }
 }

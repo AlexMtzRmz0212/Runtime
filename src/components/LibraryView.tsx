@@ -4,9 +4,10 @@ import { Funnel, Star } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { hours } from "@/lib/distance";
 import { plural, score1, yearLabel } from "@/lib/format";
 import type { ShowSummary } from "@/lib/types";
-import { ProgressBar, StatusChip, progressText } from "./Bits";
+import { ProgressBar, StatusChip, courseText } from "./Bits";
 import { FetchCovers } from "./FetchCovers";
 import { useFindKey } from "./useFindKey";
 import { useOwner } from "./useOwner";
@@ -23,6 +24,13 @@ const SORTS: { value: Sort; label: string }[] = [
 ];
 
 const num = (n?: number) => n ?? -1;
+
+/** Shows listed beside the lead bib in Continue watching; the rest are one click away. */
+const ROWS = 5;
+
+/** "11 h to go", or the episodes left when the show's length isn't known. */
+const toGo = (s: ShowSummary) =>
+  s.distance && s.distance.total > s.distance.done ? `${hours(s.distance.total - s.distance.done)} to go` : `${plural(s.progress.total - s.progress.watched, "episode")} left`;
 
 const sorters: Record<Sort, (a: ShowSummary, b: ShowSummary) => number> = {
   top: (a, b) => (a.top ?? "99").localeCompare(b.top ?? "99") || num(b.score) - num(a.score) || a.name.localeCompare(b.name),
@@ -71,7 +79,6 @@ export function LibraryView({ shows }: { shows: ShowSummary[] }) {
   }, []);
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
-  const [platform, setPlatform] = useState("");
   const [genre, setGenre] = useState("");
   const [sort, setSort] = useState<Sort>("top");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -85,7 +92,6 @@ export function LibraryView({ shows }: { shows: ShowSummary[] }) {
     setQ(p.get("q") ?? "");
     setStatus(p.get("status") ?? "");
     setType(p.get("type") ?? "");
-    setPlatform(p.get("platform") ?? "");
     setGenre(p.get("genre") ?? "");
     const s = p.get("sort");
     if (s && s in sorters) setSort(s as Sort);
@@ -94,16 +100,15 @@ export function LibraryView({ shows }: { shows: ShowSummary[] }) {
   useEffect(() => {
     if (!fromUrl) return;
     const p = new URLSearchParams();
-    for (const [k, v] of Object.entries({ q, status, type, platform, genre, sort: sort === "top" ? "" : sort })) if (v) p.set(k, v);
+    for (const [k, v] of Object.entries({ q, status, type, genre, sort: sort === "top" ? "" : sort })) if (v) p.set(k, v);
     const search = p.size > 0 ? `?${p}` : "";
     if (search !== window.location.search) window.history.replaceState(null, "", `${window.location.pathname}${search}`);
-  }, [fromUrl, q, status, type, platform, genre, sort]);
+  }, [fromUrl, q, status, type, genre, sort]);
 
   const options = useMemo(
     () => ({
       status: uniq([shows.flatMap((s) => (s.status ? [s.status] : []))]),
       type: uniq([shows.flatMap((s) => (s.type ? [s.type] : []))]),
-      platform: uniq(shows.map((s) => s.platforms)),
       genre: uniq(shows.map((s) => s.genres)),
     }),
     [shows],
@@ -112,13 +117,17 @@ export function LibraryView({ shows }: { shows: ShowSummary[] }) {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return shows
-      .filter((s) => (!needle || s.name.toLowerCase().includes(needle)) && (!status || s.status === status) && (!type || s.type === type) && (!platform || s.platforms.includes(platform)) && (!genre || s.genres.includes(genre)))
+      .filter((s) => (!needle || s.name.toLowerCase().includes(needle)) && (!status || s.status === status) && (!type || s.type === type) && (!genre || s.genres.includes(genre)))
       .sort(sorters[sort]);
-  }, [shows, q, status, type, platform, genre, sort]);
+  }, [shows, q, status, type, genre, sort]);
 
-  const filtering = Boolean(q || status || type || platform || genre);
-  const activeFilters = [status, type, platform, genre].filter(Boolean).length + (sort === "top" ? 0 : 1);
-  const watching = shows.filter((s) => s.status === "In Progress" && s.next);
+  const filtering = Boolean(q || status || type || genre);
+  const activeFilters = [status, type, genre].filter(Boolean).length + (sort === "top" ? 0 : 1);
+  // The show touched last (a tick, a status change, any edit in Notion) comes first.
+  const watching = shows.filter((s) => s.status === "In Progress" && s.next).sort((a, b) => (b.lastActive ?? "").localeCompare(a.lastActive ?? ""));
+  const [lead, ...others] = watching;
+  const rest = others.slice(0, ROWS);
+  const more = others.length - rest.length;
 
   return (
     <div>
@@ -126,29 +135,56 @@ export function LibraryView({ shows }: { shows: ShowSummary[] }) {
       <FetchCovers
         missing={shows.filter((s) => !s.poster).map((s) => ({ slug: s.slug, name: s.name }))}
         noIcon={shows.filter((s) => s.needsIcon).map((s) => ({ slug: s.slug, name: s.name }))}
+        noRuntime={shows.filter((s) => s.runtime === undefined).map((s) => ({ slug: s.slug, name: s.name }))}
       />
 
-      {!filtering && watching.length > 0 && (
-        <section aria-labelledby="continue" className="mb-10">
+      {!filtering && lead && (
+        <section aria-labelledby="continue" className="mb-12">
           <h2 id="continue" className="mb-3 font-display text-xl font-bold">Continue watching</h2>
-          {/* Each show you're on wears a race bib: its number is the next episode. */}
-          <ul className="-mx-1 flex gap-4 overflow-x-auto px-1 pt-1 pb-3">
-            {watching.map((s) => (
-              <li key={s.slug} className="w-60 shrink-0">
-                <Link href={`/show/${s.slug}`} className="bib flex h-full flex-col overflow-hidden rounded-md">
-                  <span className="block truncate bg-accent px-6 py-2 text-center text-sm font-bold text-ink font-stretch-semi-condensed">{s.name}</span>
-                  <span className="flex flex-1 flex-col items-center justify-center px-4 pt-3 pb-4">
-                    <span className="text-xs">Next up</span>
-                    <span className="font-display text-7xl leading-[0.85] font-black tabular-nums">{s.next}</span>
-                  </span>
-                  <span className="perforated block px-5 pt-2.5 pb-4">
-                    <ProgressBar progress={s.progress} status={s.status} label={`${s.name} progress`} splits={s.splits} onPaper run />
-                    <span className="mt-1 block text-center text-xs tabular-nums">{progressText(s.progress)}</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {/* The show touched last wears the race bib, its number the next episode; the others line up beside it. */}
+          <div className="grid gap-x-8 gap-y-4 md:grid-cols-[minmax(0,25rem)_minmax(0,1fr)] md:items-start">
+            <Link href={`/show/${lead.slug}`} className="group flex gap-4">
+              <Poster url={lead.poster} name={lead.name} className="w-32 shrink-0 self-start sm:w-36" />
+              <span className="bib flex min-w-0 flex-1 flex-col overflow-hidden rounded-md">
+                <span className="block truncate bg-accent px-6 py-2 text-center text-sm font-bold text-ink font-stretch-semi-condensed">{lead.name}</span>
+                <span className="flex flex-1 flex-col items-center justify-center px-3 pt-3 pb-4">
+                  <span className="text-xs">Next up</span>
+                  <span className="font-display text-5xl leading-[0.85] font-black tabular-nums sm:text-6xl">{lead.next}</span>
+                </span>
+                <span className="perforated block px-5 pt-2.5 pb-4">
+                  <ProgressBar progress={lead.progress} status={lead.status} label={`${lead.name} progress`} splits={lead.splits} onPaper run />
+                  <span className="mt-1 block text-center text-xs tabular-nums">{toGo(lead)}</span>
+                </span>
+              </span>
+            </Link>
+
+            {rest.length > 0 && (
+              <div>
+                <ol>
+                  {rest.map((s) => (
+                    <li key={s.slug}>
+                      <Link href={`/show/${s.slug}`} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-panel">
+                        <Poster url={s.poster} name={s.name} className="w-8 shrink-0" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">{s.name}</span>
+                          <span className="mt-1 block max-w-48">
+                            <ProgressBar progress={s.progress} status={s.status} label={`${s.name} progress`} />
+                          </span>
+                        </span>
+                        <span className="bib bib-sm shrink-0 rounded-[3px] px-2.5 pt-1.5 pb-1 font-display text-xl leading-none font-black tabular-nums">{s.next}</span>
+                        <span className="hidden w-24 shrink-0 text-right text-sm text-muted tabular-nums sm:block">{toGo(s)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+                {more > 0 && (
+                  <button type="button" className="mt-2 cursor-pointer text-sm text-muted underline underline-offset-2 transition-colors hover:text-text" onClick={() => setStatus("In Progress")}>
+                    {plural(more, "more show")} in progress
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </section>
       )}
 
@@ -187,7 +223,6 @@ export function LibraryView({ shows }: { shows: ShowSummary[] }) {
         <div id="filters" className={`${filtersOpen ? "grid" : "hidden"} col-span-2 grid-cols-2 gap-3 sm:contents`}>
           <Select label="Status" value={status} onChange={setStatus} options={options.status} all="Any status" />
           <Select label="Type" value={type} onChange={setType} options={options.type} all="Any type" />
-          <Select label="Platform" value={platform} onChange={setPlatform} options={options.platform} all="Any platform" />
           <Select label="Genre" value={genre} onChange={setGenre} options={options.genre} all="Any genre" />
           <label className="block min-w-0">
             <span className="sr-only">Sort by</span>
@@ -231,7 +266,7 @@ export function LibraryView({ shows }: { shows: ShowSummary[] }) {
                   {s.top && <span className="shrink-0 rounded bg-ok px-1.5 py-0.5 text-xs font-bold text-ink" title="Top pick">#{Number(s.top)}</span>}
                 </div>
                 <p className="mb-3 text-sm text-muted">
-                  {[s.type, yearLabel(s), s.platforms.join(", ")].filter(Boolean).join(", ")}
+                  {[s.type, yearLabel(s)].filter(Boolean).join(", ")}
                 </p>
                 <div className="mt-auto">
                   <div className="mb-2.5 flex flex-wrap items-center gap-2">
@@ -242,7 +277,7 @@ export function LibraryView({ shows }: { shows: ShowSummary[] }) {
                   {s.progress.source !== "none" && (
                     <>
                       <ProgressBar progress={s.progress} status={s.status} label={`${s.name} progress`} splits={s.splits} />
-                      <p className="mt-1.5 min-h-4 text-xs text-muted">{progressText(s.progress)}</p>
+                      <p className="mt-1.5 min-h-4 text-xs text-muted">{courseText(s.progress, s.distance)}</p>
                     </>
                   )}
                 </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { describeRule, isWatched, planFill, watchedRule } from "@/lib/fill";
-import { pickBest, showFromTvmaze, toCandidate, toEpisodes, type Candidate } from "@/lib/tvmaze";
+import { RecentEpisodes, describeRule, episodeKey, isEpisodeKey, isWatched, planFill, watchedRule } from "@/lib/fill";
+import { pickBest, showFromTvmaze, toCandidate, toCast, toCreators, toEpisodes, type Candidate } from "@/lib/tvmaze";
 
 const today = "2026-10-20";
 
@@ -42,6 +42,25 @@ describe("planFill", () => {
   it("is empty when everything exists", () => {
     expect(planFill(listed, listed, { kind: "none" }, today)).toEqual({ toCreate: [], already: 3 });
   });
+  it("skips episodes created a moment ago that Notion doesn't list yet", () => {
+    expect(planFill([], listed, { kind: "none" }, today, ["1x1", "1x3"]).toCreate.map((e) => e.episode)).toEqual([2]);
+  });
+});
+
+describe("RecentEpisodes", () => {
+  it("remembers a show's episodes until they expire, and releases the ones asked", () => {
+    const recent = new RecentEpisodes(1000);
+    recent.add("show", ["1x1", "1x2"], 0);
+    expect(recent.of("show", 500)).toEqual(["1x1", "1x2"]);
+    expect(recent.of("other", 500)).toEqual([]);
+    recent.remove("show", ["1x2"]);
+    expect(recent.of("show", 500)).toEqual(["1x1"]);
+    expect(recent.of("show", 1000)).toEqual([]);
+  });
+  it("only accepts real episode keys", () => {
+    expect(["5x8", episodeKey({ season: 12, episode: 104 })].every(isEpisodeKey)).toBe(true);
+    expect(["5", "x8", "5x8x1", 58, "../x"].some(isEpisodeKey)).toBe(false);
+  });
 });
 
 describe("TVmaze data", () => {
@@ -70,16 +89,10 @@ describe("TVmaze data", () => {
     const show = showFromTvmaze(
       { ...toCandidate(raw), network: "Netflix" },
       [{ season: 1, episode: 1, title: "x" }, { season: 5, episode: 1, title: "y" }],
-      { genres: ["Drama", "Crime", "Comedy"], platforms: ["Netflix", "HBO"], types: ["TV Series", "Anime"] },
+      { genres: ["Drama", "Crime", "Comedy"], types: ["TV Series", "Anime"] },
       "Want to watch",
     );
-    expect(show).toEqual({ name: "Breaking Bad", type: "TV Series", status: "Want to watch", genres: ["Drama", "Crime"], platforms: ["Netflix"], seasons: 5, startDate: "2008-01-20", endDate: "2013-09-29", tvmazeId: 169, poster: "https://static.tvmaze.com/x.jpg" });
-  });
-
-  it("maps streaming names to your platform options and skips unknown networks", () => {
-    const choices = { genres: [], platforms: ["Amazon", "Netflix"], types: ["TV Series"] };
-    expect(showFromTvmaze({ ...toCandidate(raw), network: "Prime Video" }, [], choices).platforms).toEqual(["Amazon"]);
-    expect(showFromTvmaze({ ...toCandidate(raw), network: "AMC" }, [], choices).platforms).toEqual([]);
+    expect(show).toEqual({ name: "Breaking Bad", type: "TV Series", status: "Want to watch", genres: ["Drama", "Crime"], seasons: 5, startDate: "2008-01-20", endDate: "2013-09-29", tvmazeId: 169, poster: "https://static.tvmaze.com/x.jpg" });
   });
 });
 
@@ -122,7 +135,7 @@ describe("covers", () => {
     expect(newShowToProperties({ name: "X", poster: "https://x/y.jpg" }, "Name").Poster).toEqual({ url: "https://x/y.jpg" });
   });
   it("a new show from TVmaze carries its poster", () => {
-    const show = showFromTvmaze(toCandidate(raw), [], { genres: [], platforms: [], types: ["TV Series"] });
+    const show = showFromTvmaze(toCandidate(raw), [], { genres: [], types: ["TV Series"] });
     expect(show.poster).toBe("https://static.tvmaze.com/uploads/images/original_untouched/1/2.jpg");
   });
 });
@@ -135,7 +148,7 @@ describe("icons", () => {
   });
   it("keeps hasIcon out of what visitors get", async () => {
     const { toPublicShow } = await import("@/lib/types");
-    const pub = toPublicShow({ slug: "x", pageId: "p", pageIds: ["p"], name: "X", genres: [], platforms: [], cast: [], directors: [], poster: "https://x/y.jpg", hasIcon: false });
+    const pub = toPublicShow({ slug: "x", pageId: "p", pageIds: ["p"], name: "X", genres: [], cast: [], directors: [], poster: "https://x/y.jpg", hasIcon: false });
     expect("hasIcon" in pub).toBe(false);
     expect(pub.poster).toBe("https://x/y.jpg");
   });
@@ -157,5 +170,12 @@ describe("poster options", () => {
     for (const bad of ["http://static.tvmaze.com/uploads/images/a.jpg", "https://evil.example/uploads/images/a.jpg", "https://static.tvmaze.com/other/a.jpg", "https://static.tvmaze.com/uploads/images/../x", undefined, 5]) {
       expect(isTvmazeImage(bad)).toBe(false);
     }
+  });
+});
+
+describe("cast and creators", () => {
+  it("reads names in order, without repeats or commas", () => {
+    expect(toCast([{ person: { name: "Bryan Cranston" } }, { person: { name: "Aaron Paul" } }, { person: { name: "Bryan Cranston" } }, { person: { name: "Smith, Jr." } }])).toEqual(["Bryan Cranston", "Aaron Paul", "Smith Jr."]);
+    expect(toCreators([{ type: "Creator", person: { name: "Vince Gilligan" } }, { type: "Executive Producer", person: { name: "Mark Johnson" } }])).toEqual(["Vince Gilligan"]);
   });
 });

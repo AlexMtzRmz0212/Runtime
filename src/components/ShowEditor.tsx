@@ -17,7 +17,7 @@ interface Props {
 
 const toNum = (s: string) => (s.trim() === "" ? null : Number(s));
 
-/** Owner-only panel on the show page: status, score and (for shows without an episode list) where you are. */
+/** Owner-only, inside Controls: status, score and (for shows without an episode list) where you are. */
 export function ShowEditor({ slug, statusOptions, status, score, currentSeason, lastWatchedEpisode, hasEpisodes }: Props) {
   const owner = useOwner();
   const router = useRouter();
@@ -52,9 +52,8 @@ export function ShowEditor({ slug, statusOptions, status, score, currentSeason, 
   }
 
   return (
-    <form onSubmit={save} className="mb-8 rounded-lg border border-accent/40 bg-panel p-4" aria-label="Edit show">
-      <h2 className="mb-3 font-display text-lg font-bold">Edit</h2>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <form onSubmit={save} aria-label="Edit show" className="flex flex-wrap items-end gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:[&>label]:w-44">
         <label className="col-span-2 sm:col-span-1">
           <span className="label">Status</span>
           <select className="input" value={st} onChange={(e) => setSt(e.target.value)}>
@@ -81,7 +80,7 @@ export function ShowEditor({ slug, statusOptions, status, score, currentSeason, 
           </>
         )}
       </div>
-      <div className="mt-4 flex items-center gap-3">
+      <div className="flex items-center gap-3">
         <button className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : "Save"}</button>
         {msg && (
           <span role={msg.ok ? "status" : "alert"} className={`text-sm ${msg.ok ? "text-ok" : "text-danger"}`}>

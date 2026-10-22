@@ -22,7 +22,6 @@ export interface Show {
   /** "Top": rank to recommend to others, "01" to "09". */
   top?: string;
   genres: string[];
-  platforms: string[];
   cast: string[];
   directors: string[];
   // Private: never leave the server for visitors (see toPublicShow).
@@ -30,6 +29,8 @@ export interface Show {
   tvmazeId?: number;
   /** Cover image URL (from TVmaze). Also set as the Notion page cover. */
   poster?: string;
+  /** Minutes of every aired episode added up (TVmaze). The course length; shown in hours. */
+  runtime?: number;
   /** Whether the Notion page already has an icon (so the poster is only added as one where there is none). */
   hasIcon?: boolean;
   watchedWith?: string;
@@ -37,13 +38,15 @@ export interface Show {
   scoreMish?: number;
   scoreChar?: number;
   createdTime?: string;
+  /** When any of the show's Notion rows was last changed (ISO time). */
+  editedTime?: string;
 }
 
-export type PublicShow = Omit<Show, "pageId" | "pageIds" | "hasIcon" | "watchedWith" | "scoreAlex" | "scoreMish" | "scoreChar" | "createdTime">;
+export type PublicShow = Omit<Show, "pageId" | "pageIds" | "hasIcon" | "watchedWith" | "scoreAlex" | "scoreMish" | "scoreChar" | "createdTime" | "editedTime">;
 
 export function toPublicShow(show: Show): PublicShow {
-  const { pageId, pageIds, hasIcon, watchedWith, scoreAlex, scoreMish, scoreChar, createdTime, ...rest } = show;
-  void pageId, pageIds, hasIcon, watchedWith, scoreAlex, scoreMish, scoreChar, createdTime;
+  const { pageId, pageIds, hasIcon, watchedWith, scoreAlex, scoreMish, scoreChar, createdTime, editedTime, ...rest } = show;
+  void pageId, pageIds, hasIcon, watchedWith, scoreAlex, scoreMish, scoreChar, createdTime, editedTime;
   return rest;
 }
 
@@ -59,11 +62,15 @@ export interface Episode {
   watchedDate?: string;
   /** YYYY-MM-DD, when it airs (or aired). Unknown for episodes added by hand. */
   airDate?: string;
+  /** Started but not finished: on screen right now. */
+  watching?: boolean;
+  /** When the row was last changed (ISO time). Server only. */
+  editedTime?: string;
 }
 
-export type PublicEpisode = Pick<Episode, "season" | "episode" | "title" | "watched" | "watchedDate">;
+export type PublicEpisode = Pick<Episode, "season" | "episode" | "title" | "watched" | "watchedDate" | "watching" | "airDate">;
 
-export const toPublicEpisode = ({ season, episode, title, watched, watchedDate }: Episode): PublicEpisode => ({ season, episode, title, watched, watchedDate });
+export const toPublicEpisode = ({ season, episode, title, watched, watchedDate, watching, airDate }: Episode): PublicEpisode => ({ season, episode, title, watched, watchedDate, watching, airDate });
 
 /** Fields the owner can change on a show. null clears the value. */
 export interface ShowPatch {
@@ -80,19 +87,24 @@ export interface ShowPatch {
   seasons?: number | null;
   startDate?: string | null;
   endDate?: string | null;
+  runtime?: number | null;
+  // Filled from TVmaze by the Controls panel.
+  genres?: string[];
+  cast?: string[];
+  directors?: string[];
 }
 
 export interface NewShow {
   name: string;
   type?: string;
   status?: string;
-  platforms?: string[];
   genres?: string[];
   seasons?: number;
   startDate?: string;
   endDate?: string;
   tvmazeId?: number;
   poster?: string;
+  runtime?: number;
   /** Episode count of each season, in order: [7, 13, 13]. Creates the Episodes rows too. */
   episodesPerSeason?: number[];
 }
@@ -104,6 +116,8 @@ export interface NewEpisode {
   watched?: boolean;
   watchedDate?: string;
   airDate?: string;
+  /** Minutes, from TVmaze. Only used to add up the show's Runtime; not saved per episode. */
+  runtime?: number;
 }
 
 export interface Progress {
@@ -137,4 +151,13 @@ export interface ShowSummary extends PublicShow {
   splits?: Split[];
   /** "S2E12", when there is a next episode to watch. */
   next?: string;
+  /** The course in minutes: how long the whole show is, and how much of it is behind you. */
+  distance?: Distance;
+  /** Last change to the show or any of its episodes (ISO time): what Continue watching is ordered by. */
+  lastActive?: string;
+}
+
+export interface Distance {
+  total: number;
+  done: number;
 }

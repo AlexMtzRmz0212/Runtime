@@ -1,5 +1,6 @@
+import { hours } from "@/lib/distance";
 import { statusTone, type Tone } from "@/lib/format";
-import type { Progress, Split } from "@/lib/types";
+import type { Distance, Progress, Split } from "@/lib/types";
 
 const dot: Record<Tone, string> = { done: "bg-ok", active: "bg-accent", waiting: "bg-warn", want: "bg-info", idle: "bg-muted" };
 
@@ -91,4 +92,13 @@ export function progressText(p: Progress): string {
     default:
       return "";
   }
+}
+
+/** Progress plus what's left of the course: "128 of 201 episodes, 49 h to go". */
+export function courseText(p: Progress, distance?: Distance): string {
+  const text = progressText(p);
+  if (!distance) return text;
+  const left = distance.total - distance.done;
+  if (left <= 0) return `${text}, ${hours(distance.total)} run`;
+  return `${text}, ${hours(left)} to go`;
 }

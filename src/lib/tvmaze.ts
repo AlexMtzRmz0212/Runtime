@@ -20,10 +20,15 @@ export interface Candidate {
   poster?: string;
   genres: string[];
   type?: string;
+  /** Minutes per episode, on average. */
+  averageRuntime?: number;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Raw = any;
+
+/** A runtime in minutes, or undefined when TVmaze has none (null, 0). */
+const minutes = (v: unknown): number | undefined => (typeof v === "number" && v > 0 ? v : undefined);
 
 export function toCandidate(raw: Raw): Candidate {
   const https = (u?: string) => u?.replace(/^http:/, "https:");
@@ -39,6 +44,7 @@ export function toCandidate(raw: Raw): Candidate {
     poster: https(raw.image?.original ?? raw.image?.medium ?? undefined),
     genres: Array.isArray(raw.genres) ? raw.genres : [],
     type: raw.type || undefined,
+    averageRuntime: minutes(raw.averageRuntime) ?? minutes(raw.runtime),
   };
 }
 
@@ -66,53 +72,50 @@ export function toEpisodes(raw: Raw[]): NewEpisode[] {
     const key = `${e.season}x${e.number}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ season: e.season, episode: e.number, title: String(e.name ?? "").trim() || `Episode ${e.number}`, airDate: e.airdate || undefined });
+    out.push({ season: e.season, episode: e.number, title: String(e.name ?? "").trim() || `Episode ${e.number}`, airDate: e.airdate || undefined, runtime: minutes(e.runtime) });
   }
   return out.sort((a, b) => a.season - b.season || a.episode - b.episode);
+}
+
+/**
+ * Minutes of every episode that has aired by `today`, added up: the show's Runtime. An episode without its own runtime counts
+ * as the show's average. Undefined when nothing is known.
+ */
+export function totalRuntime(episodes: { airDate?: string; runtime?: number }[], average: number | undefined, today: string): number | undefined {
+  let total = 0;
+  for (const e of episodes) {
+    if (e.airDate && e.airDate > today) continue;
+    const minutes = e.runtime ?? average;
+    if (minutes === undefined) return undefined;
+    total += minutes;
+  }
+  return total > 0 ? Math.round(total) : undefined;
 }
 
 export async function getEpisodes(id: number): Promise<NewEpisode[]> {
   return toEpisodes(await getJson(`/shows/${id}/episodes`));
 }
 
-const PLATFORM_ALIASES: Record<string, string> = {
-  netflix: "Netflix",
-  "prime video": "Amazon",
-  "amazon prime video": "Amazon",
-  amazon: "Amazon",
-  hbo: "HBO",
-  "hbo max": "HBO",
-  max: "HBO",
-  "apple tv+": "Apple",
-  "apple tv": "Apple",
-  "disney+": "Disney+",
-  "paramount+": "Paramount",
-  "paramount+ with showtime": "Paramount",
-  youtube: "YouTube",
-  "star+": "Star+",
-};
-
 /** Keep only values that already exist as options of the Notion column: never invent new options. */
-function onlyExisting(values: string[], options: string[]): string[] {
+export function onlyExisting(values: string[], options: string[]): string[] {
   const byKey = new Map(options.map((o) => [normalizeName(o), o]));
   return [...new Set(values.map((v) => byKey.get(normalizeName(v))).filter((v): v is string => Boolean(v)))];
 }
 
-/** A new TV Shows row from a TVmaze show and its episodes. Genres and platforms are limited to the options you already have. */
-export function showFromTvmaze(c: Candidate, episodes: NewEpisode[], choices: { genres: string[]; platforms: string[]; types: string[] }, status?: string): NewShow {
-  const platformName = c.network ? (PLATFORM_ALIASES[c.network.toLowerCase()] ?? c.network) : undefined;
+/** A new TV Shows row from a TVmaze show and its episodes. Genres are limited to the options you already have. */
+export function showFromTvmaze(c: Candidate, episodes: NewEpisode[], choices: { genres: string[]; types: string[] }, status?: string, today = new Date().toISOString().slice(0, 10)): NewShow {
   const anime = c.genres.some((g) => g.toLowerCase() === "anime");
   return {
     name: c.name,
     type: onlyExisting([anime ? "Anime" : "TV Series"], choices.types)[0],
     status,
     genres: onlyExisting(c.genres, choices.genres),
-    platforms: platformName ? onlyExisting([platformName], choices.platforms) : [],
     seasons: episodes.length ? Math.max(...episodes.map((e) => e.season)) : undefined,
     startDate: c.premiered,
     endDate: c.ended,
     tvmazeId: c.id,
     poster: c.poster,
+    runtime: totalRuntime(episodes, c.averageRuntime, today),
   };
 }
 
@@ -160,6 +163,22 @@ export async function getPosterOptions(id: number): Promise<PosterOption[]> {
   const [images, seasons] = await Promise.all([getJson(`/shows/${id}/images`), getJson(`/shows/${id}/seasons`)]);
   return toPosterOptions(images, seasons);
 }
+
+/** Notion option names can't hold commas. */
+const optionName = (name: unknown) => String(name ?? "").replace(/,/g, "").trim();
+
+/** The main cast, in TVmaze's billing order. */
+export function toCast(raw: Raw[], limit = 8): string[] {
+  return [...new Set(raw.map((c) => optionName(c.person?.name)).filter(Boolean))].slice(0, limit);
+}
+
+/** Whoever TVmaze lists as the show's creator. */
+export function toCreators(raw: Raw[]): string[] {
+  return [...new Set(raw.filter((c) => c.type === "Creator").map((c) => optionName(c.person?.name)).filter(Boolean))];
+}
+
+export const getCast = async (id: number) => toCast(await getJson(`/shows/${id}/cast`));
+export const getCreators = async (id: number) => toCreators(await getJson(`/shows/${id}/crew`));
 
 /** "Still running" means not ended: airing now, or between seasons with no decision yet. */
 export const isStillRunning = (status?: string) => status === "Running" || status === "To Be Determined";

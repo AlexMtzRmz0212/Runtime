@@ -6,7 +6,7 @@ import { normalizeName } from "@/lib/merge";
 import { getStore } from "@/lib/store";
 import { getEpisodes, getShow, showFromTvmaze } from "@/lib/tvmaze";
 
-/** Create the TV Shows row for a TVmaze show (name, dates, genres, platform...). Its episodes are filled in right after by /api/shows/<slug>/fill. */
+/** Create the TV Shows row for a TVmaze show (name, dates, genres...). Its episodes are filled in right after by /api/shows/<slug>/fill. */
 export async function POST(request: Request) {
   try {
     const body = (await request.json().catch(() => ({}))) as { tvmazeId?: unknown; status?: unknown };

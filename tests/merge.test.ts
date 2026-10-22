@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { attachEpisodes, mergeShows, normalizeName, slugify, type RawShow } from "@/lib/merge";
 import type { Episode } from "@/lib/types";
 
-const raw = (over: Partial<RawShow>): RawShow => ({ pageId: "p", pageIds: ["p"], name: "X", genres: [], platforms: [], cast: [], directors: [], ...over });
+const raw = (over: Partial<RawShow>): RawShow => ({ pageId: "p", pageIds: ["p"], name: "X", genres: [], cast: [], directors: [], ...over });
 
 describe("normalizeName", () => {
   it("ignores case, accents and punctuation", () => {
@@ -36,6 +36,10 @@ describe("mergeShows", () => {
 
   it("skips rows without a name", () => {
     expect(mergeShows([raw({ name: "  " })])).toEqual([]);
+  });
+  it("is edited when its newest row was", () => {
+    const [show] = mergeShows([raw({ pageId: "old", name: "A", createdTime: "1", editedTime: "2026-10-01" }), raw({ pageId: "new", name: "A", createdTime: "2", editedTime: "2026-10-20" })]);
+    expect(show.editedTime).toBe("2026-10-20");
   });
 });
 

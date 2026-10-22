@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { plural } from "@/lib/format";
 
-const PLATFORMS = ["Netflix", "Amazon", "Claro", "YouTube", "Apple", "Star+", "HBO", "Paramount", "Disney+"];
 const TYPES = ["TV Series", "Mini Series", "Saga", "Anime", "Film Series"];
 
 /** "7, 13 13" -> [7, 13, 13]. Returns null when something isn't a whole number. */
@@ -19,7 +18,6 @@ export function AddShowForm({ statusOptions }: { statusOptions: string[] }) {
   const [name, setName] = useState("");
   const [type, setType] = useState("TV Series");
   const [status, setStatus] = useState(statusOptions.includes("Want to watch") ? "Want to watch" : (statusOptions[0] ?? ""));
-  const [platforms, setPlatforms] = useState<string[]>([]);
   const [counts, setCounts] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,7 +30,7 @@ export function AddShowForm({ statusOptions }: { statusOptions: string[] }) {
     if (parsed === null) return setError("Episodes per season: whole numbers like 7, 13, 13");
     setBusy(true);
     setError("");
-    const body = { name, type, status: status || undefined, platforms, episodesPerSeason: parsed.length ? parsed : undefined };
+    const body = { name, type, status: status || undefined, episodesPerSeason: parsed.length ? parsed : undefined };
     const res = await fetch("/api/shows", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
     const data = (await res?.json().catch(() => null)) as { slug?: string; error?: string } | null;
     if (res?.ok && data?.slug) router.push(`/show/${data.slug}`);
@@ -66,25 +64,6 @@ export function AddShowForm({ statusOptions }: { statusOptions: string[] }) {
           </select>
         </label>
       </div>
-      <fieldset>
-        <legend className="label">Platform</legend>
-        <div className="flex flex-wrap gap-2">
-          {PLATFORMS.map((p) => {
-            const on = platforms.includes(p);
-            return (
-              <button
-                type="button"
-                key={p}
-                aria-pressed={on}
-                onClick={() => setPlatforms(on ? platforms.filter((x) => x !== p) : [...platforms, p])}
-                className={`chip cursor-pointer transition-colors ${on ? "border-accent text-text" : "hover:border-muted"}`}
-              >
-                {p}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
       <label>
         <span className="label">Episodes per season (optional)</span>
         <input className="input" placeholder="7, 13, 13" inputMode="numeric" value={counts} onChange={(e) => setCounts(e.target.value)} aria-describedby="counts-hint" />

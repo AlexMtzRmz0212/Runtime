@@ -229,3 +229,23 @@ dialog.quick::backdrop {
     animation: rise 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 }
+
+/* Finisher medal: a ribbon in the course colours with a bib-paper stripe down the middle, cut into a V above the disc. */
+.medal-ribbon {
+  display: block;
+  width: 3.25rem;
+  height: 3.5rem;
+  background: var(--paper);
+  border-inline: 1.1rem solid var(--accent);
+  clip-path: polygon(0 0, 100% 0, 78% 100%, 22% 100%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .medal-hang {
+    transform-origin: 50% 0;
+    transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .medal:hover .medal-hang,
+  .medal:focus-visible .medal-hang {
+    transform: rotate(-4deg);
+  }
+}

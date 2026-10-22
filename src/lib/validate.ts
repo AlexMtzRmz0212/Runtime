@@ -8,7 +8,8 @@ const bad = (error: string): { ok: false; error: string } => ({ ok: false, error
 const isInt = (v: unknown, min: number, max: number): v is number => typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
 
-export const today = () => new Date().toISOString().slice(0, 10);
+/** YYYY-MM-DD where you watch: in TIME_ZONE ("America/Mexico_City") when set, else the server's own zone (UTC on Vercel). */
+export const today = () => new Date().toLocaleDateString("en-CA", { timeZone: process.env.TIME_ZONE || undefined });
 
 /** Only the four fields the owner may edit; anything else in the body is ignored. */
 export function parsePatch(body: Record<string, unknown>, statusOptions: string[]): Result<ShowPatch> {
@@ -45,10 +46,6 @@ export function parseNewShow(body: Record<string, unknown>, statusOptions: strin
   if (body.status !== undefined && body.status !== "") {
     if (typeof body.status !== "string" || (statusOptions.length > 0 && !statusOptions.includes(body.status))) return bad("Unknown status");
     show.status = body.status;
-  }
-  if (body.platforms !== undefined) {
-    if (!Array.isArray(body.platforms) || body.platforms.some((p) => typeof p !== "string" || !p.trim() || p.includes(","))) return bad("Platforms must be names without commas");
-    show.platforms = (body.platforms as string[]).map((p) => p.trim()).slice(0, 10);
   }
   if (body.episodesPerSeason !== undefined) {
     const eps = body.episodesPerSeason;

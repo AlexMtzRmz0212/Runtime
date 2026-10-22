@@ -73,11 +73,11 @@ export function FillEpisodes({ slug, name, tvmazeId, hasEpisodes, status, season
   const label = hasEpisodes ? "Sync new episodes" : "Fill episodes";
 
   return (
-    <section aria-labelledby="fill" className="mb-8 rounded-lg border border-border bg-panel p-4">
+    <section aria-labelledby="fill">
+      <h3 id="fill" className="label">{hasEpisodes ? "Episodes from TVmaze" : "No episode list yet"}</h3>
       <div className="flex flex-wrap items-center gap-3">
-        <h2 id="fill" className="font-display text-lg font-bold">{hasEpisodes ? "Episodes from TVmaze" : "No episode list yet"}</h2>
         {(phase === "idle" || phase === "done") && (
-          <button className="btn btn-primary" onClick={start}>{label}</button>
+          <button className={`btn ${hasEpisodes ? "" : "btn-primary"}`} onClick={start}>{label}</button>
         )}
         {phase === "done" && <span role="status" className="text-sm text-ok">{note}</span>}
       </div>

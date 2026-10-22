@@ -4,7 +4,7 @@ import type { RawShow } from "../merge";
 import type { Episode } from "../types";
 import { episodesSource, notion, showsSource, type NotionAny } from "../notion/client";
 import { SHOW } from "../notion/schema";
-import { newEpisodeToProperties, newShowToProperties, pageToEpisode, pageToShow, showPatchToProperties, watchedToProperties } from "../notion/mapper";
+import { newEpisodeToProperties, newShowToProperties, pageToEpisode, pageToShow, showPatchToProperties, watchedToProperties, watchingToProperties } from "../notion/mapper";
 import type { Store } from "./types";
 
 async function queryAll(dataSourceId: string): Promise<NotionAny[]> {
@@ -38,7 +38,7 @@ export const notionStore: Store = {
 
   async choices() {
     const { options } = await showsSource();
-    return { genres: options[SHOW.genre] ?? [], platforms: options[SHOW.platform] ?? [], types: options[SHOW.type] ?? [] };
+    return { genres: options[SHOW.genre] ?? [], types: options[SHOW.type] ?? [] };
   },
 
   async listShows(): Promise<RawShow[]> {
@@ -65,6 +65,11 @@ export const notionStore: Store = {
     await mapLimit(episodePageIds, WRITE_CONCURRENCY, (page_id) => notion().pages.update({ page_id, properties }));
   },
 
+  async setWatching(episodePageIds, watching) {
+    const properties = watchingToProperties(watching);
+    await mapLimit(episodePageIds, WRITE_CONCURRENCY, (page_id) => notion().pages.update({ page_id, properties }));
+  },
+
   async createShow(input) {
     const { dataSourceId, titleProp, statusType } = await showsSource();
     const page: NotionAny = await notion().pages.create({
@@ -75,13 +80,14 @@ export const notionStore: Store = {
     return page.id;
   },
 
-  async createEpisodes(showPageId, items) {
+  async createEpisodes(showPageId, items, onCreated) {
     const { dataSourceId, titleProp } = await needEpisodes();
-    await mapLimit(items, WRITE_CONCURRENCY, (item) =>
-      notion().pages.create({
+    await mapLimit(items, WRITE_CONCURRENCY, async (item) => {
+      await notion().pages.create({
         parent: { type: "data_source_id", data_source_id: dataSourceId },
         properties: newEpisodeToProperties(showPageId, item, titleProp),
-      }),
-    );
+      });
+      onCreated?.(item);
+    });
   },
 };

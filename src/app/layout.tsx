@@ -26,6 +26,7 @@ function BibMark() {
 
 const links = [
   { href: "/", label: "Library" },
+  { href: "/finishers", label: "Finishers" },
   { href: "/top", label: "Top" },
 ];
 

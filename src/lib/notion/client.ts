@@ -67,12 +67,13 @@ export function refreshSources() {
   episodes = undefined;
 }
 
-/** Adds the two columns the app needs on TV Shows (TVmaze id, Poster), only when missing. Nothing is removed or renamed. */
+/** Adds the columns the app needs on TV Shows (TVmaze id, Poster, Runtime), only when missing. Nothing is removed or renamed. */
 async function ensureShowColumns(): Promise<Source> {
   const source = await readSource(required("SHOWS_DATABASE_ID"));
   const wanted: Record<string, NotionAny> = {
     [SHOW.tvmazeId]: { number: { format: "number" } },
     [SHOW.poster]: { url: {} },
+    [SHOW.runtime]: { number: { format: "number" } },
   };
   const missing = Object.fromEntries(Object.entries(wanted).filter(([name]) => source.props[name] === undefined));
   if (Object.keys(missing).length > 0) {

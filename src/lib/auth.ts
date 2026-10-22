@@ -20,7 +20,7 @@ function equal(a: string, b: string) {
 }
 
 /** Pages and endpoints open to visitors: the read-only showcase. Everything else is owner-only. */
-const PUBLIC_PATHS = ["/", "/top", "/login", "/api/login", "/api/logout", "/api/me", "/api/shows-index"];
+const PUBLIC_PATHS = ["/", "/finishers", "/top", "/login", "/api/login", "/api/logout", "/api/me", "/api/shows-index"];
 export const isPublicPath = (pathname: string) => PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/show/");
 
 /** With no APP_PASSWORD the gate is open in development and closed in production. */

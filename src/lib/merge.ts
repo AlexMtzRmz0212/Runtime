@@ -39,10 +39,12 @@ export function mergeShows(rows: RawShow[]): Show[] {
     const merged: RawShow = { ...sorted[0], pageIds: sorted.map((r) => r.pageId) };
     for (const other of sorted.slice(1)) {
       for (const key of Object.keys(other) as (keyof RawShow)[]) {
-        if (key === "pageId" || key === "pageIds" || key === "createdTime") continue;
+        if (key === "pageId" || key === "pageIds" || key === "createdTime" || key === "editedTime") continue;
         if (isEmpty(merged[key]) && !isEmpty(other[key])) (merged as unknown as Record<string, unknown>)[key] = other[key];
       }
     }
+    // Edited when any of its rows was.
+    merged.editedTime = sorted.map((r) => r.editedTime ?? "").reduce((a, b) => (b > a ? b : a), "") || undefined;
     let slug = slugify(merged.name);
     for (let n = 2; used.has(slug); n++) slug = `${slugify(merged.name)}-${n}`;
     used.add(slug);
